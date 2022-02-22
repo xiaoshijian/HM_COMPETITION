@@ -41,16 +41,22 @@ sample_trn['recall_without_purchased_items'] = sample_trn.apply(
     lambda x: list(set(x.total_recall) - set(x.purchased_items)) , axis = 1
 )
 
-# 这玩意召回的质量堪忧啊
-def generate_fined_rank_training_samples(samples, p2n_ratio=3):
-    for purchased_items, rwp_items in zip(samples['purchased_items'],
-                                         samples['recall_without_purchased_items']):
-        pass
-    return 
+def generate_fined_rank_training_samples(samples, p2n_ratio=2):
+    fined_rank_samples = []
+    for customer_id, purchased_items, rwp_items in zip(samples['customer_id'],
+                                                      samples['purchased_items'],
+                                                      samples['recall_without_purchased_items']):
+        for item in purchased_items:
+            # random select sample from recall items and build up a samples pairs
+            selected_rwp_items = random.sample(rwp_items, p2n_ratio)
+            for rwp_item in selected_rwp_items:
+                fined_rank_samples.append({'customer_id': customer_id,
+                                           'positice_article': item,
+                                           'negative_article': rwp_item})
+        
+    return fined_rank_samples
 
-
-
-# sample_trn['total_recall'] = 
+samples4finedrank = generate_fined_rank_training_samples(sample_trn)
 
 
 
