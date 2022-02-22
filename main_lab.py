@@ -51,3 +51,43 @@ def generate_fined_rank_training_samples(samples, p2n_ratio=3):
 
 
 # sample_trn['total_recall'] = 
+
+
+
+# drop_duplicat
+from dateutil import parser
+import datetime
+
+
+def split_transaction_into_session(data, end_date, session_last=7, session_nums=10):
+    '''
+    iterate for end_date to get session nums
+    '''
+    date2end = end_date
+    session_list = []
+    for _ in range(session_nums):
+        date2start = parser.parse(date2end) - datetime.timedelta(days=session_last)
+        date2start = date2start.strftime('%Y-%m-%d')
+        session_condition = '(t_dat >= "{}" and t_dat < "{}")'.format(date2start, date2end)
+        session = data.query(session_condition).reset_index(drop=True)
+        session_list.append([date2start, date2end, session])
+        date2end = date2start
+    return session_list
+
+
+def get_purchased_item_session(data):
+    customer_behavior = data.groupby('customer_id')['article_id'].apply(list).reset_index(name='purchased_items')
+    return customer_behavior
+
+
+session_list = split_transaction_into_session(
+    data=transactions,
+    end_date='2020-09-23',
+    session_nums=3
+) 
+
+purchased_item_session_list = [[item[0], item[1], get_purchased_item_session(item[2])] for item in session_list]
+
+
+
+# 如果可以使用recall来recall的，就使用recall，如果不能的话，就用majority
