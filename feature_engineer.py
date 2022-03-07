@@ -109,4 +109,77 @@ def extract_apk_features(customer, transaction, na_filler=-1):
     return output
 
 
+def extract_historical_purchased_items(transaction):
+    min_ldcode = transaction['ldcode'].min()
+    lds_feat_names = ['tw', 'lw', 'llw', 'lllw']
+
+    infor = {}
+    for cid, aid, ldcode in zip(
+        transaction['customer_id'],
+        transaction['article_id'],
+        transaction['ldcode']
+    ):
+        if cid not in infor:
+            infor[cid] = {}
+        if aid not in infor[cid]:
+            infor[cid][aid] = {}
+        if ldcode - min_ldcode == 0:
+            if lds_feat_names[0] not in infor[cid][aid]: # this week
+                infor[cid][aid][lds_feat_names[0]] = 0
+            infor[cid][aid][lds_feat_names[0]] += 1
+        elif ldcode - min_ldcode == 1:  # last week
+            if lds_feat_names[1] not in infor[cid][aid]:
+                infor[cid][aid][lds_feat_names[1]] = 0
+            infor[cid][aid][lds_feat_names[1]] += 1
+        elif ldcode - min_ldcode == 2:  # past of last week
+            if lds_feat_names[2] not in infor[cid][aid]:
+                infor[cid][aid][lds_feat_names[2]] = 0
+            infor[cid][aid][lds_feat_names[2]] += 1
+        elif ldcode - min_ldcode == 3:  # past of last two week
+            if lds_feat_names[3] not in infor[cid][aid]:
+                infor[cid][aid][lds_feat_names[3]] = 0
+            infor[cid][aid][lds_feat_names[3]] += 1
+    return infor
+
+
+# merge data done
+def combine_info_and_get_sampples(
+        article_id,
+        customer_id,
+        article_feature_dict,
+        customer_feature_dict,
+        interaction_feature_dict
+):
+    features = {}
+    features.update(article_feature_dict[article_id])
+    features.update(customer_feature_dict[customer_id])
+
+    #
+    features['buying_same_article_tw'] = 0  # customer buy amount of same article this week
+    features['buying_same_article_lw'] = 0
+    features['buying_same_article_llw'] = 0
+    features['buying_same_article_lllw'] = 0
+
+    # does not purchase any in last three week
+    if customer_id not in interaction_feature_dict:
+        return features
+
+    # does not buy same article in last three week
+    if article_id not in interaction_feature_dict[customer_id]:
+        return features
+
+    if 'tw' in interaction_feature_dict[customer_id][article_id]:
+        features['buying_same_article_tw'] = interaction_feature_dict[customer_id][article_id]['tw']
+
+    if 'lw' in interaction_feature_dict[customer_id][article_id]:
+        features['buying_same_article_lw'] = interaction_feature_dict[customer_id][article_id]['lw']
+
+    if 'llw' in interaction_feature_dict[customer_id][article_id]:
+        features['buying_same_article_llw'] = interaction_feature_dict[customer_id][article_id]['llw']
+
+    if 'lllw' in interaction_feature_dict[customer_id][article_id]:
+        features['buying_same_article_lllw'] = interaction_feature_dict[customer_id][article_id]['lllw']
+
+    return features
+
 
