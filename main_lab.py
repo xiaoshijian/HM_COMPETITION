@@ -97,3 +97,71 @@ purchased_item_session_list = [[item[0], item[1], get_purchased_item_session(ite
 
 
 # 如果可以使用recall来recall的，就使用recall，如果不能的话，就用majority
+
+
+
+
+
+# I think original running performace for mv test is too slow
+# the main point should be on the comparison between pr and pr
+# I try to youhua it by using leetcode in question2
+
+
+
+'''
+it is not yet implement and check
+'''
+
+
+import numpy as np
+def last_position_of_each_elements(xy):
+    # 计算以x中每个值的最后的位置
+    xy = xy[xy[:, 0].argsort()]
+    x = xy[:, 0]
+    size = len(x)
+    value_set = set()
+    output = []
+    for i in range(len(x)-1, 0):
+        value = x[i]
+        if value not in value_set:
+            value_set.add(value)
+            output.append((value, (i + 1) / size))
+    return output[::-1]
+
+
+def cal_partial_result(pr, x_in_xy, x_in_xyr):
+    # x_in_xy, x_in_xyr均为list，其中的元素是（value，position_in_percentage）
+    l1 = len(x_in_xy)
+    l2 = len(x_in_xyr)
+    p1, p2 = 0, 0
+
+    partial_result = 0
+    while p2 < l2 and p1 < l1:
+        # 对于x_in_xy中的每一个元素，寻找在它在x_in_xyr的位置，并找出它的前一个元素
+
+        if x_in_xy[p1][0] > x_in_xyr[p2][0]:
+            while p2 < l2 and x_in_xy[p1][0] > x_in_xyr[p2][0]:
+                p2 += 1
+            ratio1 = x_in_xy[p1][1]
+            ratio2 = x_in_xyr[p2-1][1]
+            partial_result += pr * np.square(ratio1 - ratio2)
+        elif x_in_xy[p1][0] > x_in_xyr[p2][0]:
+            ratio1 = x_in_xy[p1][1]
+            ratio2 = x_in_xyr[p2][1]
+            partial_result += pr * np.square(ratio1 - ratio2)
+            p2 += 1
+        else:
+            if p2 == 0:
+                ratio1 = x_in_xy[p1][1]
+                partial_result += pr * np.square(ratio1 - 0)
+            else:
+                ratio1 = x_in_xy[p1][1]
+                ratio2 = x_in_xyr[p2 - 1][1]
+                partial_result += pr * np.square(ratio1 - ratio2)
+        p1 += 1
+
+    for p in range(p1, l1):
+        ratio1 = x_in_xy[p1][1]
+        partial_result += pr * np.square(ratio1 - 1)
+    return partial_result
+
