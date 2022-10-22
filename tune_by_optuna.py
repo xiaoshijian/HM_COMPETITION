@@ -1,5 +1,9 @@
 from sklearn.metrics import roc_auc_score
 from optuna.integration import LightGBMPruningCallback
+from sklearn.model_selection import StratifiedKFold
+import optuna
+import lightgbm as lgbm
+import xgboost as xgb
 
 def select_best_threshold(actual_label, pred_prob, thresholds_list, eval_func=None):
     # 根据模型的表现选择最好的阈值，默认使用auc作为metrics
@@ -59,6 +63,52 @@ def objective4lgbm(trial, X, y):
         best_threshold, best_score = select_best_threshold(y, preds, thresholds_list)
         cv_scores[idx] = best_score
     return np.mean(cv_scores)
+
+
+def objective4xgb(trial, X, y):
+    # 参数网格
+    param_grid = {
+        "n_estimators": trial.suggest_int("n_estimators", 200, 2000),
+        "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3),
+        "gamma": trial.suggest_float("learning_rate", 0, 10),
+        "min_gain_to_split": trial.suggest_float("min_gain_to_split", 0, 15),
+        "max_depth": trial.suggest_int("max_depth", 3, 12),
+        'min_child_weight': trial.suggest_int('min_child_weight', 20, 300)
+        "lambda": trial.suggest_float("lambda", 0, 100),
+        "alpha": trial.suggest_float("alpha", 0, 100),
+        
+        "colsample_bytree": trial.suggest_categorical('colsample_bytree', [0.3,0.4,0.5,0.6,0.7,0.8,0.9, 1.0]), 
+        "colsample_bylevel": trial.suggest_categorical('colsample_bylevel', [0.3,0.4,0.5,0.6,0.7,0.8,0.9, 1.0]),
+        "colsample_bynode": trial.suggest_categorical('colsample_bynode', [0.3,0.4,0.5,0.6,0.7,0.8,0.9, 1.0]),
+        "random_state": 2021,
+    }
+    # 5折交叉验证
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=1992)
+    cv_scores = np.empty(5)
+    for idx, (train_idx, test_idx) in enumerate(cv.split(X, y)):
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+
+        # LGBM建模
+        model = xgb.LGBMClassifier(objective="binary", **param_grid)
+        model.fit(
+            X_train,
+            y_train,
+            eval_set=[(X_test, y_test)],
+            eval_metric="binary_logloss",
+            early_stopping_rounds=100,
+            callbacks=[
+                LightGBMPruningCallback(trial, "binary_logloss")
+            ],
+        )
+        # 模型预测
+        preds = model.predict_proba(X_test)
+        # 优化指标logloss最小, 这里需要不断地去修改, 需要目标函数去改
+        thresholds_list = [i * 0.005 for i in range(200)]
+        best_threshold, best_score = select_best_threshold(y, preds, thresholds_list)
+        cv_scores[idx] = best_score
+    return np.mean(cv_scores)
+
 
   
   
