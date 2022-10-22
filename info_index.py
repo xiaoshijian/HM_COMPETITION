@@ -29,3 +29,4 @@ def cal_iv4catfeature(feature, target):
     """
     n = len(column_a)
     output = np.log( sum(column_a * column_b) * n / (sum(column_a) * sum(column_b)) + 0.00001)
+    return output
