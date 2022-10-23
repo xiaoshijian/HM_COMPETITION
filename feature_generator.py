@@ -1,7 +1,15 @@
-from tying import List
+from tying import List, Dict, Tuple, Union
+import itertools
+from category_encoders.woe import WOEEncoder
+from category_encoders.one_hot import OneHotEncoder
+import numpy as np
+import pandas as pd
 from .info_index import cal_mutualinfo4crossproduct
 
-def generate_features_by_operator(array_a, array_b, operator):
+def generate_features_by_operator(
+        array_a: Union[np.array, pd.Series], 
+        array_b: Union[np.array, pd.Series],
+        operator: str):
     """
     20221020
     对连续性特征进行加减乘除
@@ -20,7 +28,7 @@ def generate_features_by_operator(array_a, array_b, operator):
         pass
     return output
 
-def name_features_by_operator(colname_a, colname_b, operator):
+def name_features_by_operator(colname_a: str, colname_b: str, operator: str):
     """
     20221020
     对生成的特征命名
@@ -32,8 +40,8 @@ def name_features_by_operator(colname_a, colname_b, operator):
 class FeatureGeneratorByOperator(object):
     def __init__(
             self,
-            colnames_for_continous_features,
-            colname4id
+            colnames_for_continous_features: List,
+            colname4id: str,
     ):
         self._colnames_for_continous_features = colnames_for_continous_features[:]
         self._colname4id = colname4id
@@ -42,9 +50,9 @@ class FeatureGeneratorByOperator(object):
         # 就是一个dummy的接口
         return 
     
-    def transform(self, data):  # 或者改为transform更好
+    def transform(self, data: pd.DataFrame):  # 或者改为transform更好
         """
-        对连续性的特征进行两两结合，并且使用加减乘除生成特征
+        对连续性的特征进行两两结合，并且使用加减乘除生成特征，用于往后暴力筛选的
         """
         features = {
             colname4id: data[self._colname4id],
@@ -70,8 +78,8 @@ class FeatureGeneratorByOperator(object):
 class FeatureGenerator4CrossProduct(object):
     def __init__(
             self,
-            colnames_for_cross_product,
-            colname4id
+            colnames_for_cross_product: List,  # 用于生成cross_product的原始特征
+            colname4id: str,
     ):
         self._colname4id = colname4id
         self._colnames_for_cross_product = colnames_for_cross_product[:]
@@ -84,8 +92,8 @@ class FeatureGenerator4CrossProduct(object):
                 pd.DataFrame({colname: data[colname].astype("category")}) 
             )
     
-    def transform(self, data):
-        n = len(self._colnames_for_cross_product)
+    def transform(self, data: pd.DataFrame):
+        n = len(self._colnames_for_cross_product)  
         features = {self._colname4id: data[self._colname4id]}
         for i in range(n-1):
             for j in range(i+1, n):
@@ -109,7 +117,7 @@ class FeatureGenerator4CrossProduct(object):
         features = pd.DataFrame(features)
         return features
     
-    def fit_transform(self, data):
+    def fit_transform(self, data: pd.DataFrame):
         self.fit(data)
         return self.transform(data)
 
@@ -117,9 +125,9 @@ class FeatureGenerator4CrossProduct(object):
 class FeatureGenerator4CatFeatureWOE(object):
     def __init__(
             self,
-            colnames_for_woe_features,
-            colname4id,
-            colname4label
+            colnames_for_woe_features: List,
+            colname4id: str,
+            colname4label: str, 
     ):
         self._colname4id = colname4id
         self._colnames_for_woe_features = colnames_for_woe_features[:]
@@ -130,13 +138,13 @@ class FeatureGenerator4CatFeatureWOE(object):
         self._woeencoder.fit(data[self._colnames_for_woe_features].astype("category"), data[self._colname4label])
         return
     
-    def transform(self, data):
+    def transform(self, data: pd.DataFrame):
         woe_features = self._woeencoder.transform(data[self._colnames_for_woe_features].astype("category"))
         woe_features.columns = [str(col) + '_WOE' for col in woe_features.columns]
         woe_features[self._colname4id] = data[self._colname4id]
         return woe_features
     
-    def fit_transform(self, data):
+    def fit_transform(self, data: pd.DataFrame):
         self.fit(data)
         return self.transform(data)
     
@@ -147,7 +155,7 @@ class FeatureGenerator4CrossProductByMutualInfo(object):
             colnames_for_cross_product: List,
             colname4id: str,
             colname4label: str,
-            ratio=0.01
+            ratio:float = 0.01
     ):
         """
         ratio: 根据互信息提取的cross_product的比例，默认1%
@@ -156,7 +164,7 @@ class FeatureGenerator4CrossProductByMutualInfo(object):
         self._colnames_for_cross_product = colnames_for_cross_product[:]
         self._ratio = ratio
     
-    def fit(self, data):
+    def fit(self, data: pd.DataFrame):
         n = len(self._colnames_for_cross_product)
         self._colnames_and_ohe_dict = {}  # it is a orderdict
         for colname in self._colnames_for_cross_product:
@@ -170,6 +178,9 @@ class FeatureGenerator4CrossProductByMutualInfo(object):
         tmp_list = []
         for i in range(n-1):
             for j in range(i+1, n):
+                # 例如colnamea 有["A", "B"], colnameb 有["C", "D"]，
+                # 就生成4个dummy列，分别是 (colnamea_A)_(colnameb_C)、(colnamea_A)_(colnameb_D)、(colnamea_B)_(colnameb_C)、(colnamea_B)_(colnameb_D)
+                # 使用mutual_info来筛选生成的特征，保留最大的多个特征
                 first_feature_for_cross_product = self._colnames_for_cross_product[i]
                 second_feature_for_cross_product = self._colnames_for_cross_product[j]
                 ohe_for_first_feature = self._colnames_and_ohe_dict[first_feature_for_cross_product]
@@ -183,6 +194,7 @@ class FeatureGenerator4CrossProductByMutualInfo(object):
                                {second_feature_for_cross_product: data[second_feature_for_cross_product].astype("category")})
                 )
                 #TODO: 用矩阵的方法应该会快很多的，(len(a.columns) * n) dot (n * len(b.columns)) 
+                #TODO: 这里会生成很多多于的columns，可以进行进一步的优化的，只对保留的进行加码，而不是使用4层循环
                 for colname_a in a.columns:
                     for colname_b in b.columns:
                         new_feature_name = "({})_({})".format(colname_a, colname_b)
@@ -197,11 +209,12 @@ class FeatureGenerator4CrossProductByMutualInfo(object):
         self._selected_cross_product_features = {x[0]: x[1] for x in tmp_list}
                 
     
-    def transform(self, data):
+    def transform(self, data: pd.DataFrame):
         n = len(self._colnames_for_cross_product)
         features = {self._colname4id: data[self._colname4id]}
         for i in range(n-1):
             for j in range(i+1, n):
+                #TODO: 这里会生成很多多于的columns，可以进行进一步的优化的，只对保留的进行加码，而不是使用4层循环
                 first_feature_for_cross_product = self._colnames_for_cross_product[i]
                 second_feature_for_cross_product = self._colnames_for_cross_product[j]
                 ohe_for_first_feature = self._colnames_and_ohe_dict[first_feature_for_cross_product]
@@ -224,7 +237,7 @@ class FeatureGenerator4CrossProductByMutualInfo(object):
         features = pd.DataFrame(features)
         return features
     
-    def fit_transform(self, data):
+    def fit_transform(self, data: pd.DataFrame):
         self.fit(data)
         return self.transform(data)
 
