@@ -75,52 +75,6 @@ class FeatureGeneratorByOperator(object):
 
       
  
-class FeatureGenerator4CrossProduct(object):
-    def __init__(
-            self,
-            colnames_for_cross_product: List,  # 用于生成cross_product的原始特征
-            colname4id: str,
-    ):
-        self._colname4id = colname4id
-        self._colnames_for_cross_product = colnames_for_cross_product[:]
-    
-    def fit(self, data):
-        self._colnames_and_ohe_dict = {}  # it is a orderdict
-        for colname in self._colnames_for_cross_product:
-            ohe = OneHotEncoder()
-            self._colnames_and_ohe_dict[colname] = ohe.fit(
-                pd.DataFrame({colname: data[colname].astype("category")}) 
-            )
-    
-    def transform(self, data: pd.DataFrame):
-        n = len(self._colnames_for_cross_product)  
-        features = {self._colname4id: data[self._colname4id]}
-        for i in range(n-1):
-            for j in range(i+1, n):
-                first_feature_for_cross_product = self._colnames_for_cross_product[i]
-                second_feature_for_cross_product = self._colnames_for_cross_product[j]
-                ohe_for_first_feature = self._colnames_and_ohe_dict[first_feature_for_cross_product]
-                ohe_for_second_feature = self._colnames_and_ohe_dict[second_feature_for_cross_product]
-                a =  ohe_for_first_feature.transform(
-                           pd.DataFrame(
-                               {first_feature_for_cross_product: data[first_feature_for_cross_product].astype("category")})
-                )
-                b =  ohe_for_second_feature.transform(
-                           pd.DataFrame(
-                               {second_feature_for_cross_product: data[second_feature_for_cross_product].astype("category")})
-                )
-                for colname_a in a.columns:
-                    for colname_b in b.columns:
-                        new_feature_name = "({})_({})".format(colname_a, colname_b)
-                        new_feature = a[colname_a] * b[colname_b]
-                        features[new_feature_name] = new_feature
-        features = pd.DataFrame(features)
-        return features
-    
-    def fit_transform(self, data: pd.DataFrame):
-        self.fit(data)
-        return self.transform(data)
-
     
 class FeatureGenerator4CatFeatureWOE(object):
     def __init__(
