@@ -37,8 +37,12 @@ class FeatureGeneratorByOperator(object):
     ):
         self._colnames_for_continous_features = colnames_for_continous_features[:]
         self._colname4id = colname4id
+        
+    def fit(self, data):
+        # 就是一个dummy的接口
+        return 
     
-    def generate_features(self, data):  # 或者改为transform更好
+    def transform(self, data):  # 或者改为transform更好
         """
         对连续性的特征进行两两结合，并且使用加减乘除生成特征
         """
@@ -48,7 +52,9 @@ class FeatureGeneratorByOperator(object):
         colnames_combinations = list(itertools.combinations(self._colnames_for_continous_features, 2))
         elements_combinations = []
         for item in colnames_combinations:
-            for operator in ["+", "-", "*", "/"]:
+            for operator in ["+", "*", "/"]:  
+            # for operator in ["+", "-", "*", "/"]:  # TODO，在选特征的时候，遇到nonnegative的问题了，暂时就不用减少的了，以后解决这屁问题再添加
+                
                 elements_combinations.append((item[0], item[1], operator))
         
         for colname_a,colname_b, operator in elements_combinations:
@@ -58,6 +64,7 @@ class FeatureGeneratorByOperator(object):
         
         features = pd.DataFrame(features)
         return features
+
       
  
 class FeatureGenerator4CrossProduct(object):
@@ -109,7 +116,7 @@ class FeatureGenerator4CrossProduct(object):
     
 class FeatureGenerator4CatFeatureWOE(object):
     def __init__(
-            sellf,
+            self,
             colnames_for_woe_features,
             colname4id,
             colname4label
@@ -123,16 +130,17 @@ class FeatureGenerator4CatFeatureWOE(object):
         self._woeencoder.fit(data[self._colnames_for_woe_features].astype("category"), data[self._colname4label])
         return
     
-    def tranform(self, data):
-        woe_features = self._woeencoder.fit(data[self._colnames_for_woe_features].astype("category"))
+    def transform(self, data):
+        woe_features = self._woeencoder.transform(data[self._colnames_for_woe_features].astype("category"))
         woe_features.columns = [str(col) + '_WOE' for col in woe_features.columns]
         woe_features[self._colname4id] = data[self._colname4id]
-        return woe
+        return woe_features
     
     def fit_transform(self, data):
         self.fit(data)
         return self.transform(data)
     
+
 class FeatureGenerator4CrossProductByMutualInfo(object):
     def __init__(
             self,
@@ -174,6 +182,7 @@ class FeatureGenerator4CrossProductByMutualInfo(object):
                            pd.DataFrame(
                                {second_feature_for_cross_product: data[second_feature_for_cross_product].astype("category")})
                 )
+                #TODO: 用矩阵的方法应该会快很多的，(len(a.columns) * n) dot (n * len(b.columns)) 
                 for colname_a in a.columns:
                     for colname_b in b.columns:
                         new_feature_name = "({})_({})".format(colname_a, colname_b)
